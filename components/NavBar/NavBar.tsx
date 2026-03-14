@@ -12,6 +12,7 @@ import { Disc3, Home, LayoutGrid, ListMusic, Mic2, Music2, Search, Share2 } from
 import { usePostHog } from "posthog-js/react"
 import { useTranslation } from "react-i18next"
 
+import { DoppelgangerBadge } from "@/components/DoppelgangerBadge/DoppelgangerBadge"
 import { cn } from "@/lib/utils"
 import { usePlaylistStore } from "@/store/playlistStore"
 import { useShareLinkStore } from "@/store/shareLinkStore"
@@ -136,7 +137,8 @@ export function NavBar() {
             </Link>
           )
         })}
-        <div className="ml-auto shrink-0 pl-1">
+        <div className="ml-auto shrink-0 flex items-center gap-2 pl-1">
+          <DoppelgangerBadge />
           <UserButton />
         </div>
       </div>
@@ -159,6 +161,11 @@ export function NavBar() {
             </svg>
           </div>
           <span className="text-[17px] font-bold tracking-tight text-white">{t("nav.streamify")}</span>
+        </motion.div>
+
+        {/* Doppelgänger badge — shows when a channel is active */}
+        <motion.div variants={itemVariant} className="px-4 pb-1">
+          <DoppelgangerBadge />
         </motion.div>
 
         {/* Main navigation */}

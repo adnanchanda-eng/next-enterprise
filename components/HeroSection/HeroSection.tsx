@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import Image from "next/image"
 import Link from "next/link"
@@ -16,9 +16,11 @@ import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card"
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards"
 import { Spotlight } from "@/components/ui/spotlight"
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect"
+import { useDoppelganger } from "@/context/DoppelgangerContext"
+import { mapITunesTrackToSong } from "@/lib/itunes"
 import { cn } from "@/lib/utils"
 import { useMusicStore } from "@/store/musicStore"
-import { PLAY_STATE } from "@/types/music"
+import { PLAY_STATE, type ITunesSearchResponse, type Song } from "@/types/music"
 
 const stagger = {
   hidden: {},
@@ -59,23 +61,48 @@ export function HeroSection() {
     homeError,
   } = useMusicStore()
 
+  const { activeChannel } = useDoppelganger()
+  const [doppelgangerSongs, setDoppelgangerSongs] = useState<Song[]>([])
+
   useEffect(() => {
     fetchPopularContent()
   }, [fetchPopularContent])
 
+  // When a doppelganger channel is active, fetch songs from its search terms
+  useEffect(() => {
+    if (!activeChannel) {
+      setDoppelgangerSongs([])
+      return
+    }
+    const terms = activeChannel.searchTerms.slice(0, 2)
+    Promise.all(
+      terms.map((term) =>
+        fetch(`/api/itunes/search?term=${encodeURIComponent(term)}&limit=6`)
+          .then((r) => r.json() as Promise<ITunesSearchResponse>)
+          .then((data) => data.results.filter((t) => t.previewUrl).map(mapITunesTrackToSong))
+          .catch(() => [] as Song[])
+      )
+    ).then((results) => setDoppelgangerSongs(results.flat()))
+  }, [activeChannel?.id])
+
+  // Use doppelganger songs when a channel is active, otherwise use the store
+  const displayFeatured = activeChannel && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(0, 3) : featuredSongs
+  const displayTrending = activeChannel && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(3) : trendingSongs
+  const allDisplayed = [...displayFeatured, ...displayTrending]
+
   const handlePlay = (songId: string) => {
-    const song = [...featuredSongs, ...trendingSongs].find((s) => s.id === songId)
+    const song = allDisplayed.find((s) => s.id === songId)
     if (!song) return
 
     if (currentlyPlaying?.id === songId) {
       togglePlay()
     } else {
-      setPlayingTrack(song, [...featuredSongs, ...trendingSongs])
+      setPlayingTrack(song, allDisplayed)
     }
   }
 
-  const topPicks = featuredSongs.slice(0, 3)
-  const recentlyPlayed = trendingSongs.slice(0, 8)
+  const topPicks = displayFeatured.slice(0, 3)
+  const recentlyPlayed = displayTrending.slice(0, 8)
 
   if (isLoadingHome && featuredSongs.length === 0) {
     return (
@@ -175,13 +202,13 @@ export function HeroSection() {
       </motion.section>
 
       {/* Popular Songs — horizontal scroll carousel */}
-      {trendingSongs.length > 0 && (
+      {displayTrending.length > 0 && (
         <motion.section variants={fadeUp} aria-labelledby="popular-heading" className="space-y-4">
           <h2 id="popular-heading" className="text-text-primary text-xl font-bold">
-            Popular Songs
+            {activeChannel ? `${activeChannel.name.split(",")[0]} Picks` : "Popular Songs"}
           </h2>
           <div className="scrollbar-hide -mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
-            {trendingSongs.slice(0, 12).map((song) => {
+            {displayTrending.slice(0, 12).map((song) => {
               const isActive = currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING
               return (
                 <button

@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 import { AudioProvider } from "@/components/AudioProvider/AudioProvider"
 import { I18nProvider } from "@/components/I18nProvider/I18nProvider"
 import { PostHogProvider } from "@/components/PostHogProvider/PostHogProvider"
+import { DoppelgangerProvider } from "@/context/DoppelgangerContext"
 import { cn } from "@/lib/utils"
 
 import "styles/tailwind.css"
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body className="bg-surface text-text-primary antialiased overflow-hidden h-screen w-screen">
           <PostHogProvider>
             <I18nProvider>
-              <AudioProvider>{children}</AudioProvider>
+              <AudioProvider>
+                <DoppelgangerProvider>{children}</DoppelgangerProvider>
+              </AudioProvider>
             </I18nProvider>
           </PostHogProvider>
         </body>
