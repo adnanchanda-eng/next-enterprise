@@ -10,12 +10,13 @@ import { motion } from "framer-motion"
 import { ChevronRight, RefreshCw, WifiOff } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import { AddToPlaylistButton } from "@/components/AddToPlaylistButton/AddToPlaylistButton"
 import { PlayButton } from "@/components/PlayButton/PlayButton"
 import { SongCard } from "@/components/SongCard/SongCard"
-import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card"
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards"
 import { Spotlight } from "@/components/ui/spotlight"
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect"
+import { useFeatureFlag } from "@/hooks/useFeatureFlag"
 import { cn } from "@/lib/utils"
 import { useMusicStore } from "@/store/musicStore"
 import { PLAY_STATE } from "@/types/music"
@@ -73,6 +74,9 @@ export function HeroSection() {
       setPlayingTrack(song, [...featuredSongs, ...trendingSongs])
     }
   }
+
+  const playlistFeatureVariant = useFeatureFlag("playlist-add-feature")
+  const playlistFeatureEnabled = playlistFeatureVariant === "on" || playlistFeatureVariant === true
 
   const topPicks = featuredSongs.slice(0, 3)
   const recentlyPlayed = trendingSongs.slice(0, 8)
@@ -155,20 +159,14 @@ export function HeroSection() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
             >
-              <CardContainer containerClassName="py-0" className="w-full">
-                <CardBody className="h-auto w-full">
-                  <CardItem translateZ="20" className="w-full">
-                    <SongCard
-                      song={song}
-                      variant="featured"
-                      subtitle={i === 0 ? t("hero.featuredStation") : undefined}
-                      isPlaying={currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING}
-                      onPlay={() => handlePlay(song.id)}
-                      showAddToPlaylist
-                    />
-                  </CardItem>
-                </CardBody>
-              </CardContainer>
+              <SongCard
+                song={song}
+                variant="featured"
+                subtitle={i === 0 ? t("hero.featuredStation") : undefined}
+                isPlaying={currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING}
+                onPlay={() => handlePlay(song.id)}
+                showAddToPlaylist
+              />
             </motion.div>
           ))}
         </div>
@@ -184,11 +182,13 @@ export function HeroSection() {
             {trendingSongs.slice(0, 12).map((song) => {
               const isActive = currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING
               return (
-                <button
+                <div
                   key={song.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handlePlay(song.id)}
-                  className="group relative w-[140px] shrink-0 text-left"
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handlePlay(song.id) } }}
+                  className="group relative w-[140px] shrink-0 cursor-pointer text-left"
                 >
                   <div className="relative aspect-square w-full overflow-hidden rounded-xl shadow-lg shadow-black/20 transition-all duration-300 group-hover:shadow-black/40 group-hover:shadow-xl">
                     <Image
@@ -219,6 +219,15 @@ export function HeroSection() {
                       )}
                     </div>
                     {isActive && <div className="ring-accent pointer-events-none absolute inset-0 rounded-xl ring-2" />}
+                    {/* AddToPlaylist — top-right corner on hover */}
+                    {playlistFeatureEnabled && (
+                      <div
+                        className="absolute right-1.5 top-1.5 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <AddToPlaylistButton song={song} dropdownPosition="bottom" />
+                      </div>
+                    )}
                   </div>
                   <div className="mt-2 space-y-0.5 px-0.5">
                     <p className={cn("truncate text-[13px] font-semibold", isActive ? "text-accent" : "text-text-primary")}>
@@ -226,7 +235,7 @@ export function HeroSection() {
                     </p>
                     <p className="text-text-tertiary truncate text-[11px]">{song.artist.name}</p>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -293,6 +302,15 @@ export function HeroSection() {
                       <PlayButton isPlaying={false} onToggle={() => handlePlay(song.id)} size="sm" tabIndex={-1} />
                     )}
                   </div>
+                  {/* AddToPlaylist — top-right on hover */}
+                  {playlistFeatureEnabled && (
+                    <div
+                      className="absolute right-1.5 top-1.5 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                      onClick={(e) => { e.stopPropagation() }}
+                    >
+                      <AddToPlaylistButton song={song} dropdownPosition="bottom" />
+                    </div>
+                  )}
                   {/* Active ring indicator */}
                   {isActive && <div className="ring-accent pointer-events-none absolute inset-0 rounded-xl ring-2" />}
                 </div>

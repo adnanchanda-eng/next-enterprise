@@ -44,7 +44,9 @@ interface MusicStore {
   isShuffled: boolean
   isRepeating: boolean
   isExpanded: boolean
+  isPlayerDismissed: boolean
   queue: Song[]
+  manualQueue: Song[]
   originalCollection: Song[]
   history: Song[]
   recentSongs: Song[]
@@ -56,6 +58,9 @@ interface MusicStore {
   setBuffering: (isBuffering: boolean) => void
   setExpanded: (isExpanded: boolean) => void
   toggleExpanded: () => void
+  dismissPlayer: () => void
+  restorePlayer: () => void
+  addToQueue: (song: Song) => void
   setSearchQuery: (query: string) => void
   setPlayingTrack: (song: Song | null, collection?: Song[]) => void
   togglePlay: () => void
@@ -97,7 +102,9 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   isShuffled: false,
   isRepeating: false,
   isExpanded: false,
+  isPlayerDismissed: false,
   queue: [],
+  manualQueue: [],
   originalCollection: [],
   history: [],
   recentSongs: [],
@@ -155,6 +162,12 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
   setExpanded: (isExpanded: boolean) => set({ isExpanded }),
   toggleExpanded: () => set((state) => ({ isExpanded: !state.isExpanded })),
+  dismissPlayer: () => set({ isPlayerDismissed: true, isExpanded: false }),
+  restorePlayer: () => set({ isPlayerDismissed: false }),
+  addToQueue: (song: Song) =>
+    set((state) => ({
+      manualQueue: state.manualQueue.some((s) => s.id === song.id) ? state.manualQueue : [...state.manualQueue, song],
+    })),
 
   setCurrentTime: (time) => set({ currentTime: time }),
   setDuration: (duration) => set({ duration }),
@@ -185,13 +198,28 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   toggleRepeat: () => set((state) => ({ isRepeating: !state.isRepeating, isShuffled: false })),
 
   playNext: () => {
-    const { queue, originalCollection, isShuffled, isRepeating, currentlyPlaying } = get()
+    const { queue, manualQueue, originalCollection, isShuffled, isRepeating, currentlyPlaying } = get()
     if (isRepeating && currentlyPlaying) {
       set({ currentTime: 0, playState: PLAY_STATE.PLAYING })
       return
     }
     const history = currentlyPlaying ? [currentlyPlaying, ...get().history] : get().history
-    
+
+    // Drain manualQueue first (user-queued songs have priority)
+    if (manualQueue.length > 0) {
+      const nextSong = manualQueue[0]!
+      set({
+        currentlyPlaying: nextSong,
+        playState: PLAY_STATE.PLAYING,
+        currentTime: 0,
+        duration: 0,
+        isBuffering: true,
+        manualQueue: manualQueue.slice(1),
+        history,
+      })
+      return
+    }
+
     if (queue.length === 0) {
       if (isShuffled && originalCollection.length > 1) {
         const newPool = originalCollection.filter(s => s.id !== currentlyPlaying?.id)

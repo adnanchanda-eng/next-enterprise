@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react"
 
+import posthog from "posthog-js"
+
 import { useMusicStore } from "@/store/musicStore"
 import { PLAY_STATE } from "@/types/music"
 
@@ -42,6 +44,24 @@ export function useAudioPlayer() {
 
     // New song selected
     if (currentlyPlaying.id !== prevSongIdRef.current) {
+      // Track partial listen of the previous song before switching
+      const prevProgress = audio.currentTime
+      const prevDuration = audio.duration
+      if (prevSongIdRef.current && prevProgress > 0 && prevDuration > 0 && isFinite(prevDuration)) {
+        const pct = prevProgress / prevDuration
+        if (pct < 0.9) {
+          const prevState = useMusicStore.getState()
+          posthog.capture("song_partially_listened", {
+            song_id: prevSongIdRef.current,
+            song_title: prevState.currentlyPlaying?.title,
+            artist_name: prevState.currentlyPlaying?.artist?.name,
+            progress_seconds: Math.round(prevProgress),
+            duration_seconds: Math.round(prevDuration),
+            percent_listened: Math.round(pct * 100),
+          })
+        }
+      }
+
       loadingNewTrackRef.current = true
       audio.pause()
       audio.src = currentlyPlaying.previewUrl
@@ -87,13 +107,22 @@ export function useAudioPlayer() {
     }
 
     const handleEnded = () => {
-      if (store().isRepeating) {
+      const state = store()
+      if (state.currentlyPlaying) {
+        posthog.capture("song_fully_listened", {
+          song_id: state.currentlyPlaying.id,
+          song_title: state.currentlyPlaying.title,
+          artist_name: state.currentlyPlaying.artist.name,
+          duration_seconds: Math.round(audio.duration || 0),
+        })
+      }
+      if (state.isRepeating) {
         audio.currentTime = 0
         audio.play().catch(() => {})
         return
       }
-      store().setCurrentTime(store().duration)
-      store().playNext()
+      state.setCurrentTime(state.duration)
+      state.playNext()
     }
 
     const handleLoadedMetadata = () => {

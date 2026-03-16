@@ -139,40 +139,67 @@ export function ArtistsPageContent() {
             ))}
           </motion.div>
         ) : (
-          <motion.div key="list" variants={stagger} initial="hidden" animate="show" className="space-y-6">
+          <motion.div key="list" variants={stagger} initial="hidden" animate="show" className="space-y-10">
             {artists.map((artist) => (
-              <motion.div key={artist.id} variants={fadeUp}>
-                <div className="mb-2 flex items-center gap-3 px-1">
-                  <div className="relative size-10 overflow-hidden rounded-full ring-1 ring-white/10">
+              <motion.div key={artist.id} variants={fadeUp} className="overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] shadow-xl shadow-black/30">
+                {/* Artist header */}
+                <div className="relative flex items-center gap-4 overflow-hidden px-5 py-5">
+                  {/* blurred background derived from artist image */}
+                  <div className="pointer-events-none absolute inset-0 scale-110 blur-2xl">
                     <Image
                       src={artist.image}
-                      alt={artist.name}
-                      width={40}
-                      height={40}
-                      className="size-10 rounded-full object-cover"
+                      alt=""
+                      fill
+                      className="object-cover opacity-20"
+                      sizes="100vw"
                     />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-white">{artist.name}</h2>
-                    <p className="text-text-tertiary text-xs">
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
+
+                  {/* Avatar */}
+                  <div className="relative shrink-0">
+                    <div className="relative size-20 overflow-hidden rounded-full ring-2 ring-white/20 shadow-lg shadow-black/40">
+                      <Image
+                        src={artist.image}
+                        alt={artist.name}
+                        fill
+                        className="object-cover"
+                        sizes="80px"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Name + count */}
+                  <div className="relative min-w-0">
+                    <p className="text-text-tertiary mb-0.5 text-[11px] font-semibold uppercase tracking-widest">
+                      {t("artists.title").replace(/s$/, "")}
+                    </p>
+                    <h2 className="truncate text-2xl font-bold text-white drop-shadow">{artist.name}</h2>
+                    <p className="text-text-tertiary mt-0.5 text-xs">
                       {t("artists.tracksCount", { count: artist.songs.length })}
                     </p>
                   </div>
                 </div>
-                <div className="bg-surface-list overflow-hidden rounded-xl border border-white/[0.08] backdrop-blur-sm shadow-lg shadow-black/20">
-                  {artist.songs.map((song, index) => (
-                    <div
+
+                {/* Divider + songs label */}
+                <div className="flex items-center gap-3 border-t border-white/[0.06] px-5 py-3">
+                  <span className="text-text-tertiary text-[11px] font-semibold uppercase tracking-widest">
+                    Songs
+                  </span>
+                  <div className="h-px flex-1 bg-white/[0.06]" />
+                </div>
+
+                {/* Songs list */}
+                <div className="px-2 pb-3">
+                  {artist.songs.map((song) => (
+                    <SongCard
                       key={song.id}
-                      className={index < artist.songs.length - 1 ? "border-b border-white/[0.06]" : ""}
-                    >
-                      <SongCard
-                        song={song}
-                        variant="trending"
-                        isPlaying={currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING}
-                        onPlay={() => handlePlay(song.id)}
-                        showAddToPlaylist
-                      />
-                    </div>
+                      song={song}
+                      variant="trending"
+                      isPlaying={currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING}
+                      onPlay={() => handlePlay(song.id)}
+                      showAddToPlaylist
+                    />
                   ))}
                 </div>
               </motion.div>

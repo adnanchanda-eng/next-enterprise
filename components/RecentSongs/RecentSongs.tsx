@@ -6,6 +6,8 @@ import { useUser } from "@clerk/nextjs"
 import { motion } from "framer-motion"
 import { Clock, Music2, Pause, Play, X } from "lucide-react"
 
+import { AddToPlaylistButton } from "@/components/AddToPlaylistButton/AddToPlaylistButton"
+import { useFeatureFlag } from "@/hooks/useFeatureFlag"
 import { useMusicStore } from "@/store/musicStore"
 import type { Song } from "@/types/music"
 import { PLAY_STATE } from "@/types/music"
@@ -18,6 +20,8 @@ export function RecentSongs() {
   const { user } = useUser()
   const { recentSongs, removeRecentSong, currentlyPlaying, playState, setPlayingTrack, togglePlay } = useMusicStore()
   const isPlaying = playState === PLAY_STATE.PLAYING
+  const playlistFeatureVariant = useFeatureFlag("playlist-add-feature")
+  const playlistFeatureEnabled = playlistFeatureVariant === "on" || playlistFeatureVariant === true
 
   if (!user || !recentSongs || recentSongs.length === 0) return null
 
@@ -85,10 +89,19 @@ export function RecentSongs() {
                 type="button"
                 aria-label="Remove from recent searches"
                 onClick={(e) => handleDelete(e, song.id)}
-                className="absolute top-1 right-1 z-10 flex size-6 items-center justify-center rounded-full bg-black/40 text-white/70 opacity-0 backdrop-blur-sm transition-all duration-200 hover:bg-black/60 hover:text-white group-hover:opacity-100"
+                className="absolute top-1 left-1 z-10 flex size-6 items-center justify-center rounded-full bg-black/40 text-white/70 opacity-0 backdrop-blur-sm transition-all duration-200 hover:bg-black/60 hover:text-white group-hover:opacity-100"
               >
                 <X size={14} />
               </button>
+              {/* AddToPlaylist button */}
+              {playlistFeatureEnabled && (
+                <div
+                  className="absolute top-1 right-1 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <AddToPlaylistButton song={song} dropdownPosition="bottom" />
+                </div>
+              )}
 
               {/* Play/Pause overlay */}
               <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all duration-200 group-hover:bg-black/30">
@@ -159,9 +172,19 @@ export function RecentSongs() {
                 </div>
 
                 {/* Duration */}
-                <span className="shrink-0 text-xs tabular-nums text-white/30">
+                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-white/30">
                   {Math.floor(song.duration / 60)}:{String(song.duration % 60).padStart(2, "0")}
                 </span>
+
+                {/* AddToPlaylist */}
+                {playlistFeatureEnabled && (
+                  <div
+                    className="flex shrink-0 items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <AddToPlaylistButton song={song} dropdownPosition="top" />
+                  </div>
+                )}
 
                 {/* Delete button */}
                 <button
