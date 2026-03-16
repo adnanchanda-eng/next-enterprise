@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 import { useUser } from "@clerk/nextjs"
 import { Check, ListPlus, Plus, X } from "lucide-react"
@@ -27,7 +28,13 @@ export function AddToPlaylistButton({ song, className, dropdownPosition = "botto
     const [feedback, setFeedback] = useState<{ playlistId: number; type: "success" | "error" | "duplicate" } | null>(null)
     const [showCreate, setShowCreate] = useState(false)
     const [newName, setNewName] = useState("")
+    const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
+    const [mounted, setMounted] = useState(false)
+
+    const buttonRef = useRef<HTMLButtonElement>(null)
     const dropdownRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => { setMounted(true) }, [])
 
     // Fetch playlists when dropdown opens
     useEffect(() => {
@@ -40,7 +47,10 @@ export function AddToPlaylistButton({ song, className, dropdownPosition = "botto
     useEffect(() => {
         if (!isOpen) return
         const handler = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+            const target = e.target as Node
+            const inDropdown = dropdownRef.current?.contains(target)
+            const inButton = buttonRef.current?.contains(target)
+            if (!inDropdown && !inButton) {
                 setIsOpen(false)
                 setShowCreate(false)
                 setNewName("")
@@ -50,12 +60,46 @@ export function AddToPlaylistButton({ song, className, dropdownPosition = "botto
         return () => document.removeEventListener("mousedown", handler)
     }, [isOpen])
 
+    // Close on scroll so fixed dropdown doesn't drift
+    useEffect(() => {
+        if (!isOpen) return
+        const handler = () => { setIsOpen(false); setShowCreate(false); setNewName("") }
+        window.addEventListener("scroll", handler, true)
+        return () => window.removeEventListener("scroll", handler, true)
+    }, [isOpen])
+
     // Clear feedback after delay
     useEffect(() => {
         if (!feedback) return
         const timer = setTimeout(() => setFeedback(null), 2000)
         return () => clearTimeout(timer)
     }, [feedback])
+
+    const handleToggle = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        const nextOpen = !isOpen
+        if (nextOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect()
+            const DROPDOWN_H = 280
+            const rightVal = Math.max(4, window.innerWidth - rect.right)
+            const spaceBelow = window.innerHeight - rect.bottom
+            const spaceAbove = rect.top
+            // prefer requested position, fall back if not enough space
+            const showAbove = dropdownPosition === "top"
+                ? spaceAbove >= DROPDOWN_H || spaceAbove >= spaceBelow
+                : spaceBelow < DROPDOWN_H && spaceAbove > spaceBelow
+            if (showAbove) {
+                setDropdownStyle({ position: "fixed", bottom: window.innerHeight - rect.top + 4, right: rightVal })
+            } else {
+                setDropdownStyle({ position: "fixed", top: rect.bottom + 4, right: rightVal })
+            }
+            posthog?.capture("playlist_dropdown_opened", {
+                song_id: song.id,
+                dropdown_position: dropdownPosition,
+            })
+        }
+        setIsOpen(nextOpen)
+    }
 
     const handleAdd = useCallback(
         async (playlistId: number) => {
@@ -103,42 +147,29 @@ export function AddToPlaylistButton({ song, className, dropdownPosition = "botto
             setNewName("")
             setShowCreate(false)
         } catch {
-            posthog?.capture("playlist_quick_create_failed", {
-                song_id: song.id,
-            })
-            /* error in store */
+            posthog?.capture("playlist_quick_create_failed", { song_id: song.id })
         }
     }, [user?.id, newName, createPlaylist, addSong, posthog, song])
 
     return (
-        <div className={cn("relative", className)} ref={dropdownRef}>
+        <div className={cn("relative", className)}>
             <button
-                onClick={(e) => {
-                    e.stopPropagation()
-                    const nextOpen = !isOpen
-                    setIsOpen(nextOpen)
-                    if (nextOpen) {
-                        posthog?.capture("playlist_dropdown_opened", {
-                            song_id: song.id,
-                            dropdown_position: dropdownPosition,
-                        })
-                    }
-                }}
+                ref={buttonRef}
+                onClick={handleToggle}
                 aria-label={t("addToPlaylist.title")}
                 className="rounded-lg p-1.5 text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
             >
                 <ListPlus size={18} />
             </button>
 
-            {isOpen && (
+            {isOpen && mounted && createPortal(
                 <div
-                    className={cn(
-                        "absolute right-0 z-50 w-56 rounded-xl border border-white/[0.08] bg-[#1a1a2e] py-1 shadow-2xl",
-                        dropdownPosition === "top" ? "bottom-full mb-1" : "mt-1"
-                    )}
+                    ref={dropdownRef}
+                    style={dropdownStyle}
+                    className="z-[200] w-56 rounded-xl border border-white/[0.08] bg-[#1a1a2e] py-1 shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <p className="px-3 py-2 text-xs font-semibold tracking-wide text-white/50 uppercase">
+                    <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/50">
                         {t("addToPlaylist.title")}
                     </p>
 
@@ -195,9 +226,7 @@ export function AddToPlaylistButton({ song, className, dropdownPosition = "botto
                         <button
                             onClick={() => {
                                 setShowCreate(true)
-                                posthog?.capture("playlist_quick_create_opened", {
-                                    song_id: song.id,
-                                })
+                                posthog?.capture("playlist_quick_create_opened", { song_id: song.id })
                             }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white"
                         >
@@ -206,7 +235,7 @@ export function AddToPlaylistButton({ song, className, dropdownPosition = "botto
                         </button>
                     )}
                 </div>
-            )}
+            , document.body)}
         </div>
     )
 }

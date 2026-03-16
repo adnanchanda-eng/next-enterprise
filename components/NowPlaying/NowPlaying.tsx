@@ -5,11 +5,12 @@ import { useCallback, useEffect, useRef } from "react"
 import Image from "next/image"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { Repeat, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
+import { Music2, Repeat, Shuffle, SkipBack, SkipForward, Volume2, VolumeX, X } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { PlayButton } from "@/components/PlayButton/PlayButton"
 import { seekAudio } from "@/hooks/useAudioPlayer"
+import { useFeatureFlag } from "@/hooks/useFeatureFlag"
 import { useSongMood } from "@/hooks/useSongMood"
 import { useMusicStore } from "@/store/musicStore"
 import { PLAY_STATE } from "@/types/music"
@@ -50,7 +51,13 @@ export function NowPlaying() {
     history,
     isExpanded,
     setExpanded,
+    isPlayerDismissed,
+    dismissPlayer,
+    restorePlayer,
   } = useMusicStore()
+
+  const expandedPlayerFlag = useFeatureFlag("expanded-player-ab")
+  const canExpand = expandedPlayerFlag === "on" || expandedPlayerFlag === true
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
@@ -128,27 +135,46 @@ export function NowPlaying() {
   useEffect(() => {
     const unsubscribe = useMusicStore.subscribe(
       (state) => {
-        if (progressBarRef.current && duration > 0) {
-          const prog = (state.currentTime / duration) * 100
+        if (progressBarRef.current && state.duration > 0) {
+          const prog = (state.currentTime / state.duration) * 100
           progressBarRef.current.style.width = `${prog}%`
         }
       }
     )
     return () => unsubscribe()
-  }, [duration])
+  }, [])
 
   return (
     <>
+      {/* Restore pill — shown when player is dismissed but a song is loaded */}
       <AnimatePresence>
-        {currentlyPlaying && !isExpanded && (
+        {currentlyPlaying && isPlayerDismissed && (
+          <motion.button
+            key="restore-pill"
+            initial={{ y: -40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -40, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            onClick={restorePlayer}
+            aria-label={t("player.restore")}
+            className="fixed top-3 left-1/2 z-[60] -translate-x-1/2 flex items-center gap-2 rounded-full bg-[#0d0d0d]/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg shadow-black/40 backdrop-blur-xl border border-white/[0.08] hover:bg-white/10 transition-colors"
+          >
+            <Music2 size={13} className="text-accent" />
+            <span className="max-w-[140px] truncate">{currentlyPlaying.title}</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {currentlyPlaying && !isExpanded && !isPlayerDismissed && (
           <motion.div
             key="mini-player"
             initial={{ y: "-100%", opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "-100%", opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className="fixed inset-x-0 top-0 z-[60] bg-[#0d0d0d]/90 backdrop-blur-2xl backdrop-saturate-150 cursor-pointer shadow-xl shadow-black/20"
-            onClick={() => setExpanded(true)}
+            className={`fixed inset-x-0 top-0 z-[60] bg-[#0d0d0d]/90 backdrop-blur-2xl backdrop-saturate-150 shadow-xl shadow-black/20 ${canExpand ? "cursor-pointer" : "cursor-default"}`}
+            onClick={() => canExpand && setExpanded(true)}
           >
             {/* Subtle top glow */}
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
@@ -176,125 +202,140 @@ export function NowPlaying() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 items-center gap-2 px-3 py-2 md:px-4 relative z-10">
+            <div className="flex items-center px-3 py-3 md:px-4 relative z-10">
 
-              {/* LEFT — Song info */}
-              <div className="flex min-w-0 items-center gap-2.5">
-                <motion.div
-                  key={currentlyPlaying.id}
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                  className="relative size-9 shrink-0 overflow-hidden rounded-md shadow-lg shadow-black/30"
+              {/* LEFT — dismiss button */}
+              <div className="flex flex-1 items-center">
+                <button
+                  type="button"
+                  aria-label={t("player.dismiss")}
+                  onClick={(e) => { e.stopPropagation(); dismissPlayer() }}
+                  className="rounded-full p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/70"
                 >
-                  <Image
-                    src={currentlyPlaying.albumArt}
-                    alt={`${currentlyPlaying.title} album art`}
-                    fill
-                    className="object-cover"
-                    sizes="36px"
-                  />
-                  {playState === PLAY_STATE.PLAYING && (
-                    <div className="absolute inset-0 rounded-md ring-1 ring-accent/40" />
-                  )}
-                </motion.div>
-                <div className="min-w-0">
-                  <motion.p
-                    key={currentlyPlaying.title}
-                    initial={{ y: 4, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    className="truncate text-sm font-semibold text-white"
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* CENTER — album art + song info + divider + controls */}
+              <div className="flex items-center gap-3 shrink-0">
+
+                {/* Song info block */}
+                <div className="flex items-center gap-2.5">
+                  <motion.div
+                    key={currentlyPlaying.id}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    className="relative size-11 shrink-0 overflow-hidden rounded-md shadow-lg shadow-black/30"
                   >
-                    {currentlyPlaying.title}
-                  </motion.p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <p className="text-text-secondary truncate text-xs">{currentlyPlaying.artist.name}</p>
-                    <AnimatePresence mode="wait">
-                      {moodLoading && (
-                        <motion.div
-                          key="mood-loading"
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          className="h-3.5 w-10 rounded-full bg-white/10 animate-pulse shrink-0"
-                        />
-                      )}
-                      {!moodLoading && moodResult && moodResult.mood !== "neutral" && (
-                        <motion.div
-                          key={`mood-${moodResult.mood}`}
-                          initial={{ opacity: 0, scale: 0.7, x: -4 }}
-                          animate={{ opacity: 1, scale: 1, x: 0 }}
-                          exit={{ opacity: 0, scale: 0.7 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                          className="flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                          style={{
-                            background: `${moodResult.color}20`,
-                            color: moodResult.color,
-                            border: `1px solid ${moodResult.color}40`,
-                          }}
-                        >
-                          <span>{moodResult.emoji}</span>
-                          <span className="capitalize hidden md:inline">{moodResult.mood}</span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <Image
+                      src={currentlyPlaying.albumArt}
+                      alt={`${currentlyPlaying.title} album art`}
+                      fill
+                      className="object-cover"
+                      sizes="44px"
+                    />
+                    {playState === PLAY_STATE.PLAYING && (
+                      <div className="absolute inset-0 rounded-md ring-1 ring-accent/40" />
+                    )}
+                  </motion.div>
+                  <div className="min-w-0">
+                    <motion.p
+                      key={currentlyPlaying.title}
+                      initial={{ y: 4, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className="max-w-[180px] truncate text-sm font-semibold leading-tight text-white"
+                    >
+                      {currentlyPlaying.title}
+                    </motion.p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-text-secondary max-w-[180px] truncate text-xs leading-tight">{currentlyPlaying.artist.name}</p>
+                      <AnimatePresence mode="wait">
+                        {moodLoading && (
+                          <motion.div key="mood-loading" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="h-3.5 w-10 rounded-full bg-white/10 animate-pulse shrink-0" />
+                        )}
+                        {!moodLoading && moodResult && moodResult.mood !== "neutral" && (
+                          <motion.div
+                            key={`mood-${moodResult.mood}`}
+                            initial={{ opacity: 0, scale: 0.7, x: -4 }}
+                            animate={{ opacity: 1, scale: 1, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.7 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                            className="flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+                            style={{ background: `${moodResult.color}20`, color: moodResult.color, border: `1px solid ${moodResult.color}40` }}
+                          >
+                            <span>{moodResult.emoji}</span>
+                            <span className="capitalize hidden md:inline">{moodResult.mood}</span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <div className="mt-0.5 hidden items-center gap-1 md:flex">
+                      <span className="text-text-tertiary text-[10px] tabular-nums">{formatTime(currentTime)}</span>
+                      <span className="text-white/20 text-[10px]">/</span>
+                      <span className="text-white/35 text-[10px] tabular-nums">{formatTime(duration)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="hidden shrink-0 items-center gap-1 md:flex">
-                  <span className="text-text-tertiary text-[10px] tabular-nums">{formatTime(currentTime)}</span>
-                  <span className="text-white/20 text-[10px]">/</span>
-                  <span className="text-white/35 text-[10px] tabular-nums">{formatTime(duration)}</span>
+
+                {/* Divider — song info / controls */}
+                <div className="hidden md:block h-10 w-px shrink-0 bg-white/[0.08]" />
+
+                {/* Playback controls */}
+                <div className="flex items-center gap-1">
+                  <button
+                    className={`hidden cursor-pointer rounded-full p-2 transition-all duration-200 md:block ${
+                      isShuffled ? "text-accent bg-accent/10 ring-1 ring-accent/30" : "text-white/40 hover:text-white hover:bg-white/[0.06]"
+                    }`}
+                    aria-label={t("player.shuffle")}
+                    onClick={(e) => { e.stopPropagation(); toggleShuffle() }}
+                    type="button"
+                  >
+                    <Shuffle size={14} />
+                  </button>
+                  <button
+                    className={`hidden cursor-pointer rounded-full p-2 transition-all duration-200 md:block ${
+                      history.length === 0 ? "text-white/20 cursor-not-allowed" : "text-white/40 hover:text-white hover:bg-white/[0.06] active:scale-95"
+                    }`}
+                    aria-label={t("player.previous")}
+                    onClick={(e) => { e.stopPropagation(); playPrevious() }}
+                    disabled={history.length === 0}
+                    type="button"
+                  >
+                    <SkipBack size={16} fill="currentColor" />
+                  </button>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <PlayButton isPlaying={playState === PLAY_STATE.PLAYING} onToggle={togglePlay} size="sm" />
+                  </div>
+                  <button
+                    className="cursor-pointer rounded-full p-2 text-white/40 transition-all duration-200 hover:text-white hover:bg-white/[0.06] active:scale-95"
+                    aria-label={t("player.next")}
+                    onClick={(e) => { e.stopPropagation(); playNext() }}
+                    type="button"
+                  >
+                    <SkipForward size={16} fill="currentColor" />
+                  </button>
+                  <button
+                    className={`hidden cursor-pointer rounded-full p-2 transition-all duration-200 md:block ${
+                      isRepeating ? "text-accent bg-accent/10 ring-1 ring-accent/30" : "text-white/40 hover:text-white hover:bg-white/[0.06]"
+                    }`}
+                    aria-label={t("player.repeat")}
+                    onClick={(e) => { e.stopPropagation(); toggleRepeat() }}
+                    type="button"
+                  >
+                    <Repeat size={14} />
+                  </button>
                 </div>
+
               </div>
 
-              {/* CENTER — Playback controls */}
-              <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className={`hidden cursor-pointer rounded-full p-2 transition-all duration-200 md:block ${
-                    isShuffled ? "text-accent bg-accent/10 ring-1 ring-accent/30" : "text-white/40 hover:text-white hover:bg-white/[0.06]"
-                  }`}
-                  aria-label={t("player.shuffle")}
-                  onClick={toggleShuffle}
-                  type="button"
-                >
-                  <Shuffle size={14} />
-                </button>
-                <button
-                  className={`hidden cursor-pointer rounded-full p-2 transition-all duration-200 md:block ${
-                    history.length === 0 ? "text-white/20 cursor-not-allowed" : "text-white/40 hover:text-white hover:bg-white/[0.06] active:scale-95"
-                  }`}
-                  aria-label={t("player.previous")}
-                  onClick={playPrevious}
-                  disabled={history.length === 0}
-                  type="button"
-                >
-                  <SkipBack size={16} fill="currentColor" />
-                </button>
-                <PlayButton isPlaying={playState === PLAY_STATE.PLAYING} onToggle={togglePlay} size="sm" />
-                <button
-                  className="cursor-pointer rounded-full p-2 text-white/40 transition-all duration-200 hover:text-white hover:bg-white/[0.06] active:scale-95"
-                  aria-label={t("player.next")}
-                  onClick={playNext}
-                  type="button"
-                >
-                  <SkipForward size={16} fill="currentColor" />
-                </button>
-                <button
-                  className={`hidden cursor-pointer rounded-full p-2 transition-all duration-200 md:block ${
-                    isRepeating ? "text-accent bg-accent/10 ring-1 ring-accent/30" : "text-white/40 hover:text-white hover:bg-white/[0.06]"
-                  }`}
-                  aria-label={t("player.repeat")}
-                  onClick={toggleRepeat}
-                  type="button"
-                >
-                  <Repeat size={14} />
-                </button>
-              </div>
+              {/* Divider — center / volume */}
+              <div className="hidden md:block h-10 w-px shrink-0 bg-white/[0.08] mx-4" />
 
               {/* RIGHT — Volume */}
-              <div className="hidden items-center justify-end gap-2 md:flex" onClick={(e) => e.stopPropagation()}>
+              <div className="hidden flex-1 items-center justify-end gap-2 md:flex">
                 <button
-                  onClick={toggleMute}
+                  onClick={(e) => { e.stopPropagation(); toggleMute() }}
                   aria-label={t(isMuted ? "player.unmute" : "player.mute")}
                   className="shrink-0 text-white/50 rounded-full p-1.5 transition-all duration-200 hover:text-white hover:bg-white/[0.06]"
                 >
@@ -304,6 +345,7 @@ export function NowPlaying() {
                   ref={volumeContainerRef}
                   className="group relative flex h-8 w-28 cursor-pointer items-center"
                   onMouseDown={handleVolumeMouseDown}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {/* Track */}
                   <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/20 group-hover:h-1.5 transition-[height] duration-150">
@@ -329,7 +371,7 @@ export function NowPlaying() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {isExpanded && <ExpandedPlayer />}
+        {isExpanded && canExpand && <ExpandedPlayer />}
       </AnimatePresence>
     </>
   )
