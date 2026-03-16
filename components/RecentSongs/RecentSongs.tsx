@@ -55,14 +55,16 @@ export function RecentSongs() {
       {/* Card row — first 5 */}
       <div className="scrollbar-hide -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
         {cardSongs.map((song, i) => (
-          <motion.button
+          <motion.div
             key={song.id}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: i * 0.04 }}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => handlePlay(song)}
-            className="group flex w-[140px] shrink-0 flex-col gap-2 rounded-xl border border-transparent bg-white/[0.04] p-2.5 transition-all duration-200 hover:border-white/[0.08] hover:bg-white/[0.08] hover:shadow-lg hover:shadow-black/20 active:scale-[0.97]"
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handlePlay(song)}
+            className="group flex w-[140px] shrink-0 flex-col gap-2 rounded-xl border border-transparent bg-white/[0.04] p-2.5 transition-all duration-200 hover:border-white/[0.08] hover:bg-white/[0.08] hover:shadow-lg hover:shadow-black/20 active:scale-[0.97] cursor-pointer"
           >
             {/* Album Art */}
             <div className="relative aspect-square w-full overflow-hidden rounded-lg shadow-md">
@@ -107,7 +109,7 @@ export function RecentSongs() {
               <p className="truncate text-[13px] font-medium leading-tight text-white/90">{song.title}</p>
               <p className="truncate text-[11px] leading-tight text-white/45">{song.artist.name}</p>
             </div>
-          </motion.button>
+          </motion.div>
         ))}
       </div>
 

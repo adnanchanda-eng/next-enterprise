@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import Image from "next/image"
 import Link from "next/link"
@@ -16,9 +16,12 @@ import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card"
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards"
 import { Spotlight } from "@/components/ui/spotlight"
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect"
+import { useBlend } from "@/context/BlendContext"
+import { useDoppelganger } from "@/context/DoppelgangerContext"
+import { mapITunesTrackToSong } from "@/lib/itunes"
 import { cn } from "@/lib/utils"
 import { useMusicStore } from "@/store/musicStore"
-import { PLAY_STATE } from "@/types/music"
+import { PLAY_STATE, type ITunesSearchResponse, type Song } from "@/types/music"
 
 const stagger = {
   hidden: {},
@@ -59,23 +62,54 @@ export function HeroSection() {
     homeError,
   } = useMusicStore()
 
+  const { activeChannel } = useDoppelganger()
+  const { activeBlend } = useBlend()
+  const [doppelgangerSongs, setDoppelgangerSongs] = useState<Song[]>([])
+
   useEffect(() => {
     fetchPopularContent()
   }, [fetchPopularContent])
 
+  // The active search terms: doppelganger takes priority over blend
+  const activeSearchTerms = activeChannel?.searchTerms ?? activeBlend?.searchTerms ?? null
+
+  // When a doppelganger channel or blend is active, fetch songs from its search terms
+  useEffect(() => {
+    if (!activeSearchTerms) {
+      setDoppelgangerSongs([])
+      return
+    }
+    const terms = activeSearchTerms.slice(0, 2)
+    Promise.all(
+      terms.map((term) =>
+        fetch(`/api/itunes/search?term=${encodeURIComponent(term)}&limit=6`)
+          .then((r) => r.json() as Promise<ITunesSearchResponse>)
+          .then((data) => data.results.filter((t) => t.previewUrl).map(mapITunesTrackToSong))
+          .catch(() => [] as Song[])
+      )
+    ).then((results) => setDoppelgangerSongs(results.flat()))
+  }, [activeChannel?.id, activeBlend?.id])
+
+  // Use doppelganger/blend songs when active, otherwise use the store
+  const displayFeatured =
+    activeSearchTerms && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(0, 3) : featuredSongs
+  const displayTrending =
+    activeSearchTerms && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(3) : trendingSongs
+  const allDisplayed = [...displayFeatured, ...displayTrending]
+
   const handlePlay = (songId: string) => {
-    const song = [...featuredSongs, ...trendingSongs].find((s) => s.id === songId)
+    const song = allDisplayed.find((s) => s.id === songId)
     if (!song) return
 
     if (currentlyPlaying?.id === songId) {
       togglePlay()
     } else {
-      setPlayingTrack(song, [...featuredSongs, ...trendingSongs])
+      setPlayingTrack(song, allDisplayed)
     }
   }
 
-  const topPicks = featuredSongs.slice(0, 3)
-  const recentlyPlayed = trendingSongs.slice(0, 8)
+  const topPicks = displayFeatured.slice(0, 3)
+  const recentlyPlayed = displayTrending.slice(0, 8)
 
   if (isLoadingHome && featuredSongs.length === 0) {
     return (
@@ -174,6 +208,69 @@ export function HeroSection() {
         </div>
       </motion.section>
 
+      {/* Popular Songs — horizontal scroll carousel */}
+      {displayTrending.length > 0 && (
+        <motion.section variants={fadeUp} aria-labelledby="popular-heading" className="space-y-4">
+          <h2 id="popular-heading" className="text-text-primary text-xl font-bold">
+            {activeChannel
+              ? `${activeChannel.name.split(",")[0]} Picks`
+              : activeBlend
+                ? `${activeBlend.label} Picks`
+                : "Popular Songs"}
+          </h2>
+          <div className="scrollbar-hide -mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+            {displayTrending.slice(0, 12).map((song) => {
+              const isActive = currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING
+              return (
+                <button
+                  key={song.id}
+                  type="button"
+                  onClick={() => handlePlay(song.id)}
+                  className="group relative w-[140px] shrink-0 text-left"
+                >
+                  <div className="relative aspect-square w-full overflow-hidden rounded-xl shadow-lg shadow-black/20 transition-all duration-300 group-hover:shadow-black/40 group-hover:shadow-xl">
+                    <Image
+                      src={song.albumArt}
+                      alt={song.title}
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-110"
+                      sizes="140px"
+                    />
+                    <div
+                      className={cn(
+                        "absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity duration-200",
+                        isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      )}
+                    >
+                      {isActive ? (
+                        <div className="flex items-end gap-[2px]">
+                          <span className="animate-eq-1 bg-accent inline-block w-[3px] rounded-full" />
+                          <span className="animate-eq-2 bg-accent inline-block w-[3px] rounded-full" />
+                          <span className="animate-eq-3 bg-accent inline-block w-[3px] rounded-full" />
+                        </div>
+                      ) : (
+                        <div className="flex size-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+                            <path d="M5 3l14 9-14 9V3z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    {isActive && <div className="ring-accent pointer-events-none absolute inset-0 rounded-xl ring-2" />}
+                  </div>
+                  <div className="mt-2 space-y-0.5 px-0.5">
+                    <p className={cn("truncate text-[13px] font-semibold", isActive ? "text-accent" : "text-text-primary")}>
+                      {song.title}
+                    </p>
+                    <p className="text-text-tertiary truncate text-[11px]">{song.artist.name}</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </motion.section>
+      )}
+
       {/* Trending Now — horizontal scroll */}
       <motion.section variants={fadeUp} aria-labelledby="trending-heading" className="space-y-4">
         <Link href="/trending" className="group/link flex items-center gap-1 transition-opacity hover:opacity-80">
@@ -191,7 +288,8 @@ export function HeroSection() {
           direction="left"
           speed="normal"
           className=""
-          renderItem={(song: typeof recentlyPlayed[0]) => {
+          renderItem={(item) => {
+            const song = item as typeof recentlyPlayed[0]
             const isActive = currentlyPlaying?.id === song.id && playState === PLAY_STATE.PLAYING
             return (
               <div

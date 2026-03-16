@@ -12,7 +12,7 @@ import { Disc3, Home, LayoutGrid, ListMusic, Mic2, Music2, Search, Share2 } from
 import { usePostHog } from "posthog-js/react"
 import { useTranslation } from "react-i18next"
 
-import { useFeatureFlag } from "@/hooks/useFeatureFlag"
+import { DoppelgangerBadge } from "@/components/DoppelgangerBadge/DoppelgangerBadge"
 import { cn } from "@/lib/utils"
 import { usePlaylistStore } from "@/store/playlistStore"
 import { useShareLinkStore } from "@/store/shareLinkStore"
@@ -58,13 +58,10 @@ export function NavBar() {
   const { user } = useUser()
   const pathname = usePathname()
   const posthog = usePostHog()
-  const playlistFeatureVariant = useFeatureFlag("playlist-add-feature")
-  const playlistFeatureEnabled = playlistFeatureVariant === "on" || playlistFeatureVariant === true
   const { playlists, sharedPlaylists, fetchPlaylists, fetchSharedPlaylists } = usePlaylistStore()
   const { href: shareLinkHref, ownerName: shareLinkOwnerName } = useShareLinkStore()
   const hasSharedPlaylists = sharedPlaylists.length > 0
   const hasOwnedPlaylists = playlists.length > 0
-  const hasAnyPlaylists = hasOwnedPlaylists || hasSharedPlaylists
   const hasShareLinkPreview = !!shareLinkHref
 
   useEffect(() => {
@@ -75,34 +72,27 @@ export function NavBar() {
   }, [user?.id, fetchPlaylists, fetchSharedPlaylists])
 
   const captureNavClick = (href: string, section: "mobile" | "main" | "library") => {
-    posthog?.capture("nav_item_clicked", {
-      href,
-      section,
-      playlist_feature_variant: playlistFeatureVariant ?? "unknown",
-    })
+    posthog?.capture("nav_item_clicked", { href, section })
   }
 
-  const showPlaylistNav = playlistFeatureEnabled || hasAnyPlaylists
-  const playlistNavItem = showPlaylistNav
-    ? { 
-        href: "/playlists", 
-        labelKey: (playlistFeatureEnabled || hasOwnedPlaylists) ? "nav.playlists" as const : "share.sharedWithMe" as const, 
-        Icon: (playlistFeatureEnabled || hasOwnedPlaylists) ? ListMusic : Share2 
-      }
-    : null
+  const playlistNavItem = {
+    href: "/playlists",
+    labelKey: hasOwnedPlaylists ? "nav.playlists" as const : hasSharedPlaylists ? "share.sharedWithMe" as const : "nav.playlists" as const,
+    Icon: hasOwnedPlaylists || !hasSharedPlaylists ? ListMusic : Share2,
+  }
 
   const shareLinkNavItem =
     hasShareLinkPreview && shareLinkHref
       ? {
           href: shareLinkHref,
-        labelKey: shareLinkOwnerName ? ("share.navItem" as const) : ("share.navItemUnknown" as const),
+          labelKey: shareLinkOwnerName ? ("share.navItem" as const) : ("share.navItemUnknown" as const),
           labelParam: shareLinkOwnerName,
           Icon: Share2,
         }
       : null
 
   const resolveNav = (items: typeof libraryNav) => {
-    const resolved = items.flatMap((item) => (item.href === "/playlists" ? (playlistNavItem ? [playlistNavItem] : []) : [item]))
+    const resolved = items.flatMap((item) => (item.href === "/playlists" ? [playlistNavItem] : [item]))
     if (shareLinkNavItem) {
       resolved.push(shareLinkNavItem)
     }
@@ -147,7 +137,8 @@ export function NavBar() {
             </Link>
           )
         })}
-        <div className="ml-auto shrink-0 pl-1">
+        <div className="ml-auto shrink-0 flex items-center gap-2 pl-1">
+          <DoppelgangerBadge />
           <UserButton />
         </div>
       </div>
@@ -170,6 +161,11 @@ export function NavBar() {
             </svg>
           </div>
           <span className="text-[17px] font-bold tracking-tight text-white">{t("nav.streamify")}</span>
+        </motion.div>
+
+        {/* Doppelgänger badge — shows when a channel is active */}
+        <motion.div variants={itemVariant} className="px-4 pb-1">
+          <DoppelgangerBadge />
         </motion.div>
 
         {/* Main navigation */}

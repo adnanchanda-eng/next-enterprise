@@ -1,5 +1,6 @@
 "use client"
 
+import { BlendOverlay } from "@/components/BlendOverlay/BlendOverlay"
 import { NavBar } from "@/components/NavBar/NavBar"
 import { NowPlaying } from "@/components/NowPlaying/NowPlaying"
 import { NowPlayingSpacer } from "@/components/NowPlaying/NowPlayingSpacer"
@@ -33,6 +34,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </main>
         </div>
       </div>
+      <BlendOverlay />
     </>
   )
 }
