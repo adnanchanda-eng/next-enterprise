@@ -162,7 +162,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
   setExpanded: (isExpanded: boolean) => set({ isExpanded }),
   toggleExpanded: () => set((state) => ({ isExpanded: !state.isExpanded })),
-  dismissPlayer: () => set({ isPlayerDismissed: true, isExpanded: false }),
+  dismissPlayer: () => set({ isPlayerDismissed: true, isExpanded: false, playState: PLAY_STATE.PAUSED }),
   restorePlayer: () => set({ isPlayerDismissed: false }),
   addToQueue: (song: Song) =>
     set((state) => ({
