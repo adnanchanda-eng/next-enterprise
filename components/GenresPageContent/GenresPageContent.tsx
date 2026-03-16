@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import {
   ChevronRight,
   Disc3,
+  Flame,
   Globe,
   Guitar,
   Headphones,
@@ -17,6 +18,7 @@ import {
   Radio,
   Sparkles,
   Star,
+  Sun,
   Waves,
   WifiOff,
   Zap,
@@ -92,6 +94,38 @@ const GENRES = [
     id: "classical", name: "Classical", genreId: "5",
     icon: Music2, gradient: "from-stone-700/80 to-slate-600/80", shadow: "shadow-stone-500/25",
     photo: "1520523839897-bd0b52f945a0",
+  },
+
+  // ── Indian ──────────────────────────────────────────────────────────────────
+  {
+    id: "bollywood", name: "Bollywood", genreId: "bollywood",
+    icon: Flame, gradient: "from-orange-500/85 to-pink-600/85", shadow: "shadow-orange-500/30",
+    photo: "1518481852452-e26f4e0b1490",
+  },
+  {
+    id: "punjabi", name: "Punjabi", genreId: "punjabi",
+    icon: Zap, gradient: "from-yellow-500/85 to-lime-500/85", shadow: "shadow-yellow-500/25",
+    photo: "1493225457124-a3eb161ffa5f",
+  },
+  {
+    id: "south-indian", name: "South Indian", genreId: "south-indian",
+    icon: Globe, gradient: "from-teal-600/85 to-emerald-500/85", shadow: "shadow-teal-500/25",
+    photo: "1504910182-33ad29e21a60",
+  },
+  {
+    id: "sufi", name: "Sufi / Ghazal", genreId: "sufi",
+    icon: Waves, gradient: "from-indigo-700/85 to-purple-600/85", shadow: "shadow-indigo-500/25",
+    photo: "1510915361894-db8b60106cb1",
+  },
+  {
+    id: "devotional", name: "Devotional", genreId: "devotional",
+    icon: Sun, gradient: "from-amber-500/85 to-orange-600/85", shadow: "shadow-amber-500/30",
+    photo: "1520523839897-bd0b52f945a0",
+  },
+  {
+    id: "indie-hindi", name: "Indie Hindi", genreId: "indie-hindi",
+    icon: Sparkles, gradient: "from-slate-600/85 to-cyan-700/85", shadow: "shadow-slate-500/25",
+    photo: "1545245047-ca41c0b62ded",
   },
 ] as const
 

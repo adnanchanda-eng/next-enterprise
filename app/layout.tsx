@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 import { AudioProvider } from "@/components/AudioProvider/AudioProvider"
 import { I18nProvider } from "@/components/I18nProvider/I18nProvider"
 import { PostHogProvider } from "@/components/PostHogProvider/PostHogProvider"
+import { BlendProvider } from "@/context/BlendContext"
 import { DoppelgangerProvider } from "@/context/DoppelgangerContext"
 import { cn } from "@/lib/utils"
 
@@ -24,7 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PostHogProvider>
             <I18nProvider>
               <AudioProvider>
-                <DoppelgangerProvider>{children}</DoppelgangerProvider>
+                <DoppelgangerProvider>
+                  <BlendProvider>{children}</BlendProvider>
+                </DoppelgangerProvider>
               </AudioProvider>
             </I18nProvider>
           </PostHogProvider>

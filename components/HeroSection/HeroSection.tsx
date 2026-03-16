@@ -16,6 +16,7 @@ import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card"
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards"
 import { Spotlight } from "@/components/ui/spotlight"
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect"
+import { useBlend } from "@/context/BlendContext"
 import { useDoppelganger } from "@/context/DoppelgangerContext"
 import { mapITunesTrackToSong } from "@/lib/itunes"
 import { cn } from "@/lib/utils"
@@ -62,19 +63,23 @@ export function HeroSection() {
   } = useMusicStore()
 
   const { activeChannel } = useDoppelganger()
+  const { activeBlend } = useBlend()
   const [doppelgangerSongs, setDoppelgangerSongs] = useState<Song[]>([])
 
   useEffect(() => {
     fetchPopularContent()
   }, [fetchPopularContent])
 
-  // When a doppelganger channel is active, fetch songs from its search terms
+  // The active search terms: doppelganger takes priority over blend
+  const activeSearchTerms = activeChannel?.searchTerms ?? activeBlend?.searchTerms ?? null
+
+  // When a doppelganger channel or blend is active, fetch songs from its search terms
   useEffect(() => {
-    if (!activeChannel) {
+    if (!activeSearchTerms) {
       setDoppelgangerSongs([])
       return
     }
-    const terms = activeChannel.searchTerms.slice(0, 2)
+    const terms = activeSearchTerms.slice(0, 2)
     Promise.all(
       terms.map((term) =>
         fetch(`/api/itunes/search?term=${encodeURIComponent(term)}&limit=6`)
@@ -83,11 +88,13 @@ export function HeroSection() {
           .catch(() => [] as Song[])
       )
     ).then((results) => setDoppelgangerSongs(results.flat()))
-  }, [activeChannel?.id])
+  }, [activeChannel?.id, activeBlend?.id])
 
-  // Use doppelganger songs when a channel is active, otherwise use the store
-  const displayFeatured = activeChannel && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(0, 3) : featuredSongs
-  const displayTrending = activeChannel && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(3) : trendingSongs
+  // Use doppelganger/blend songs when active, otherwise use the store
+  const displayFeatured =
+    activeSearchTerms && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(0, 3) : featuredSongs
+  const displayTrending =
+    activeSearchTerms && doppelgangerSongs.length > 0 ? doppelgangerSongs.slice(3) : trendingSongs
   const allDisplayed = [...displayFeatured, ...displayTrending]
 
   const handlePlay = (songId: string) => {
@@ -205,7 +212,11 @@ export function HeroSection() {
       {displayTrending.length > 0 && (
         <motion.section variants={fadeUp} aria-labelledby="popular-heading" className="space-y-4">
           <h2 id="popular-heading" className="text-text-primary text-xl font-bold">
-            {activeChannel ? `${activeChannel.name.split(",")[0]} Picks` : "Popular Songs"}
+            {activeChannel
+              ? `${activeChannel.name.split(",")[0]} Picks`
+              : activeBlend
+                ? `${activeBlend.label} Picks`
+                : "Popular Songs"}
           </h2>
           <div className="scrollbar-hide -mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
             {displayTrending.slice(0, 12).map((song) => {

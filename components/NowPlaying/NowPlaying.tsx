@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next"
 
 import { PlayButton } from "@/components/PlayButton/PlayButton"
 import { seekAudio } from "@/hooks/useAudioPlayer"
+import { useSongMood } from "@/hooks/useSongMood"
 import { useMusicStore } from "@/store/musicStore"
 import { PLAY_STATE } from "@/types/music"
 
@@ -23,6 +24,7 @@ function formatTime(seconds: number): string {
 
 export function NowPlaying() {
   const { t } = useTranslation()
+  const { moodResult, isLoading: moodLoading } = useSongMood()
   const progressBarRef = useRef<HTMLDivElement>(null)
   const progressContainerRef = useRef<HTMLDivElement>(null)
   const volumeContainerRef = useRef<HTMLDivElement>(null)
@@ -205,7 +207,38 @@ export function NowPlaying() {
                   >
                     {currentlyPlaying.title}
                   </motion.p>
-                  <p className="text-text-secondary truncate text-xs">{currentlyPlaying.artist.name}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-text-secondary truncate text-xs">{currentlyPlaying.artist.name}</p>
+                    <AnimatePresence mode="wait">
+                      {moodLoading && (
+                        <motion.div
+                          key="mood-loading"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="h-3.5 w-10 rounded-full bg-white/10 animate-pulse shrink-0"
+                        />
+                      )}
+                      {!moodLoading && moodResult && moodResult.mood !== "neutral" && (
+                        <motion.div
+                          key={`mood-${moodResult.mood}`}
+                          initial={{ opacity: 0, scale: 0.7, x: -4 }}
+                          animate={{ opacity: 1, scale: 1, x: 0 }}
+                          exit={{ opacity: 0, scale: 0.7 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                          className="flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+                          style={{
+                            background: `${moodResult.color}20`,
+                            color: moodResult.color,
+                            border: `1px solid ${moodResult.color}40`,
+                          }}
+                        >
+                          <span>{moodResult.emoji}</span>
+                          <span className="capitalize hidden md:inline">{moodResult.mood}</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
                 <div className="hidden shrink-0 items-center gap-1 md:flex">
                   <span className="text-text-tertiary text-[10px] tabular-nums">{formatTime(currentTime)}</span>
